@@ -25,7 +25,7 @@ flags.DEFINE_boolean('use_gpu', True, 'Whether to use GPU')
 flags.DEFINE_string('gpu_fraction', '1/1', 'idx / # of gpu fraction e.g. 1/3, 2/3, 3/3')
 flags.DEFINE_integer('seed', 42, 'Value of random seed')
 flags.DEFINE_boolean('allow_soft_placement', True, 'Whether soft placement is allowed')
-flags.DEFINE_string('checkpoint_dir', 'model', 'The absoute path to the checkpoint directory')
+flags.DEFINE_string('checkpoint_dir', '', 'The absoute path to the checkpoint directory')
 
 FLAGS = flags.FLAGS
 
@@ -45,6 +45,8 @@ def calc_gpu_fraction(fraction_string):
 def main(_):
     if not tf.test.is_gpu_available() and FLAGS.use_gpu:
         raise Exception("use_gpu flag is true when no GPUs are available")
+
+    assert FLAGS.checkpoint_dir != '', 'Checkpoint directory must be specified'
 
     gpu_options = tf.GPUOptions(
         per_process_gpu_memory_fraction=calc_gpu_fraction(FLAGS.gpu_fraction), allow_growth=True)

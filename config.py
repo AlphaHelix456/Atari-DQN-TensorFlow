@@ -31,7 +31,7 @@ class Config:
     to_train = True
     use_gpu = True
     gpu_fraction = '1/1'
-    checkpoint_dir = 'model'
+    checkpoint_dir = ''
 
 
 def get_config(flags):

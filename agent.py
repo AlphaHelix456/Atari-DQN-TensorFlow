@@ -76,7 +76,7 @@ class DeepQAgent:
         done = True
         state = None
         iteration = 0
-        progress_bar = tqdm(range(start_step, self.max_steps), unit='steps')
+        progress_bar = tqdm(range(0, self.max_steps), initial=start_step, unit='steps')
 
         while True:
             step = self.step.eval()
