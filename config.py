@@ -20,10 +20,11 @@ class Config:
     momentum = 0.0
     decay = 0.90
     eps = 0.01
-    max_steps = 4000000
-    train_interval = 4
-    save_interval = 1000
-    copy_interval = 10000
+    max_train_steps = 4000000
+    train_freq = 4
+    save_freq = 1000
+    copy_freq = 10000
+    test_freq = 10000
     replay_memory_size = 500000
 
     # Other
@@ -36,9 +37,7 @@ class Config:
 
 def get_config(flags):
     config = Config
-
     for k, v in flags.flag_values_dict().items():
         if hasattr(config, k):
             setattr(config, k, v)
-
     return config

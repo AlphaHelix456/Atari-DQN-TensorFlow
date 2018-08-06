@@ -2,6 +2,7 @@ import numpy as np
 import os
 import tensorflow as tf
 from experience import ReplayMemory
+from summary import Summary
 from tqdm import tqdm
 
 
@@ -24,14 +25,15 @@ class DeepQAgent:
             self.new_game = self.env.new_game
 
         self.to_train = config.to_train
-        self.max_steps = config.max_steps
-        self.train_interval = config.train_interval
-        self.save_interval = config.save_interval
-        self.copy_interval = config.copy_interval
+        self.max_train_steps = config.max_train_steps
+        self.train_freq = config.train_freq
+        self.save_freq = config.save_freq
+        self.copy_freq = config.copy_freq
 
         if not os.path.isdir(config.checkpoint_dir):
             os.mkdir(config.checkpoint_dir)
 
+        self.summary = Summary(config.test_freq, self.sess, config.checkpoint_dir)
         self.checkpoint_path = os.path.join(config.checkpoint_dir, 'ckpt')
 
         self.replay_memory = ReplayMemory(config.replay_memory_size, config.batch_size)
@@ -54,13 +56,13 @@ class DeepQAgent:
         error = tf.abs(self.targets - q_values)
         clipped_error = tf.clip_by_value(error, 0.0, 1.0)
         linear_error = 2 * (error - clipped_error)
-        loss = tf.reduce_mean(tf.square(clipped_error) + linear_error)
+        self.loss = tf.reduce_mean(tf.square(clipped_error) + linear_error)
 
         optimizer = tf.train.RMSPropOptimizer(learning_rate=config.lr,
                                               decay=config.decay,
                                               momentum=config.momentum,
                                               epsilon=config.eps)
-        self.train_op = optimizer.minimize(loss, global_step=self.step)
+        self.train_op = optimizer.minimize(self.loss, global_step=self.step)
 
         self.saver = tf.train.Saver()
         self.init = tf.global_variables_initializer()
@@ -76,18 +78,16 @@ class DeepQAgent:
         done = True
         state = None
         iteration = 0
-        progress_bar = tqdm(range(0, self.max_steps), initial=start_step, unit='steps')
+        progress_bar = tqdm(range(0, self.max_train_steps), initial=start_step, unit='steps')
 
         while True:
-            step = self.step.eval()
-            if step >= self.max_steps:
-                break
+
             iteration += 1
             if done:
                 obs = self.new_game()
                 state = self.env.preprocess(obs)
 
-            eps = max(self.eps_min, self.eps_max - (self.eps_min - self.eps_max) * step/self.eps_decay_steps)
+            eps = max(self.eps_min, self.eps_max - (self.eps_min - self.eps_max) * self.step.eval()/self.eps_decay_steps)
 
             q_values = self.online_q_values.eval(feed_dict={self.inputs: [state]})
             action = self.predict(eps, q_values)
@@ -98,23 +98,28 @@ class DeepQAgent:
             self.replay_memory.add(state, action, reward, next_state, done)
             state = next_state
 
-            if iteration % self.train_interval != 0:
+            if iteration % self.train_freq != 0:
                 continue
 
             states, actions, rewards, next_states, continues = self.replay_memory.sample_memories()
             next_q_values = self.target_q_values.eval(feed_dict={self.inputs: next_states})
             max_next_q_values = np.max(next_q_values, axis=1, keepdims=True)
             y_values = rewards + continues * self.discount_factor * max_next_q_values
+            loss, _ = self.sess.run([self.loss, self.train_op], feed_dict={
+                self.inputs: states, self.actions: actions, self.targets: y_values})
+            step = self.step.eval()
 
-            self.train_op.run(feed_dict={self.inputs: states, self.actions: actions, self.targets: y_values})
-
-            if step % self.copy_interval == 0:
+            if step % self.copy_freq == 0:
                 self.copy_online_to_target.run()
 
-            if step % self.save_interval == 0:
+            if step % self.save_freq == 0:
                 self.saver.save(self.sess, self.checkpoint_path)
 
+            self.summary.record_step(step, action, reward, done, eps, np.max(q_values), loss)
             progress_bar.update(1)
+
+            if step >= self.max_train_steps:
+                break
 
     def play(self):
         pass
