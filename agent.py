@@ -50,7 +50,7 @@ class DeepQAgent:
         copy_ops = [target_var.assign(online_vars[var_name]) for var_name, target_var in target_vars.items()]
         self.copy_online_to_target = tf.group(*copy_ops)
 
-        q_values = tf.reduce_mean(self.target_q_values * tf.one_hot(self.actions, self.env.n_actions),
+        q_values = tf.reduce_sum(self.target_q_values * tf.one_hot(self.actions, self.env.n_actions),
                                   axis=1, keepdims=True)
 
         error = tf.abs(self.targets - q_values)
@@ -58,10 +58,9 @@ class DeepQAgent:
         linear_error = 2 * (error - clipped_error)
         self.loss = tf.reduce_mean(tf.square(clipped_error) + linear_error)
 
-        optimizer = tf.train.RMSPropOptimizer(learning_rate=config.lr,
-                                              decay=config.decay,
-                                              momentum=config.momentum,
-                                              epsilon=config.eps)
+        optimizer = tf.train.MomentumOptimizer(learning_rate=config.lr,
+                                               momentum=config.momentum,
+                                               use_nesterov=True)
         self.train_op = optimizer.minimize(self.loss, global_step=self.step)
 
         self.saver = tf.train.Saver()
@@ -87,12 +86,12 @@ class DeepQAgent:
                 obs = self.new_game()
                 state = self.env.preprocess(obs)
 
-            eps = max(self.eps_min, self.eps_max - (self.eps_min - self.eps_max) * self.step.eval()/self.eps_decay_steps)
+            eps = max(self.eps_min, self.eps_max - (self.eps_max-self.eps_min) * self.step.eval()/self.eps_decay_steps)
 
             q_values = self.online_q_values.eval(feed_dict={self.inputs: [state]})
             action = self.predict(eps, q_values)
 
-            obs, reward, done, _ = self.env.step(action, self.to_train)
+            obs, reward, done = self.env.step(action, self.to_train)
             next_state = self.env.preprocess(obs)
 
             self.replay_memory.add(state, action, reward, next_state, done)

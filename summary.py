@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-class Summary():
+class Summary:
     def __init__(self, test_freq, sess, checkpoint_dir):
         self.test_freq = test_freq
         self.sess = sess
@@ -22,7 +22,6 @@ class Summary():
             for tag in scalar_summary_tags:
                 self.summary_placeholders[tag] = tf.placeholder(tf.float32, None)
                 self.summary_ops[tag] = tf.summary.scalar(tag, self.summary_placeholders[tag])
-
 
             histogram_summary_tags = ['episode/rewards', 'episode/actions']
 

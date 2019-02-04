@@ -9,7 +9,6 @@ flags = tf.app.flags
 
 # Environment
 flags.DEFINE_string('env', 'MsPacman-v0', 'The name of the Atari environment to be used')
-flags.DEFINE_integer('n_action_repeat', 1, 'The number of actions to repeat')
 flags.DEFINE_integer('screen_width', 80, 'The width of the screen')
 flags.DEFINE_integer('screen_height', 88, 'The height of the screen')
 
@@ -25,7 +24,7 @@ flags.DEFINE_boolean('use_gpu', True, 'Whether to use GPU')
 flags.DEFINE_string('gpu_fraction', '1/1', 'idx / # of gpu fraction e.g. 1/3, 2/3, 3/3')
 flags.DEFINE_integer('seed', 42, 'Value of random seed')
 flags.DEFINE_boolean('allow_soft_placement', True, 'Whether soft placement is allowed')
-flags.DEFINE_string('checkpoint_dir', '', 'The absoute path to the checkpoint directory')
+flags.DEFINE_string('checkpoint_dir', '', 'The absolute path to the checkpoint directory')
 
 FLAGS = flags.FLAGS
 
@@ -37,8 +36,7 @@ def calc_gpu_fraction(fraction_string):
     idx, num = fraction_string.split('/')
     idx, num = float(idx), float(num)
 
-    fraction = 1 / (num - idx + 1)
-    print(' [*] GPU: {:.4f}'.format(fraction))
+    fraction = idx / num
     return fraction
 
 
@@ -54,7 +52,8 @@ def main(_):
     sess_config = tf.ConfigProto(
         log_device_placement=False,
         allow_soft_placement=FLAGS.allow_soft_placement,
-        gpu_options=gpu_options)
+        gpu_options=gpu_options
+    )
 
     with tf.Session(config=sess_config) as sess:
         config = get_config(FLAGS)
