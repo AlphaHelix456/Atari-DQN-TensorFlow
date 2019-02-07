@@ -31,6 +31,7 @@ class Summary:
 
     def reset(self):
         self.num_game = 0
+        self.num_actions = 0
         self.ep_reward = 0
         self.total_loss = 0
         self.total_reward = 0
@@ -43,6 +44,7 @@ class Summary:
         self.total_reward += reward
         self.total_q += q
         self.actions.append(action)
+        self.num_actions += 1
 
         if done:
             self.num_game += 1
@@ -52,13 +54,18 @@ class Summary:
             self.ep_reward += reward
 
         if step % self.test_freq == 0:
-            avg_q = self.total_q / self.test_freq
-            avg_loss = self.total_loss / self.test_freq
-            avg_reward = self.total_reward / self.test_freq
+            avg_q = self.total_q / self.num_actions
+            avg_loss = self.total_loss / self.num_actions
+            avg_reward = self.total_reward / self.num_actions
 
-            max_ep_reward = np.max(self.ep_rewards)
-            min_ep_reward = np.min(self.ep_rewards)
-            avg_ep_reward = np.mean(self.ep_rewards)
+            if self.ep_rewards:
+                max_ep_reward = np.max(self.ep_rewards)
+                min_ep_reward = np.min(self.ep_rewards)
+                avg_ep_reward = np.mean(self.ep_rewards)
+            else:
+                max_ep_reward = 0
+                min_ep_reward = 0
+                avg_ep_reward = 0
 
             self.write_summary({
                 'average/q': avg_q,
@@ -73,6 +80,8 @@ class Summary:
                 'training/epsilon': eps
             }, step)
 
+            #print('summary: Avg loss {} Avg q {} Avg reward {} max reward {} min reward {} num game {}'.format(
+              #avg_loss, avg_q, avg_reward, max_ep_reward, min_ep_reward, self.num_game))
             self.reset()
 
     def write_summary(self, tag_dict, step):

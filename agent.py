@@ -44,13 +44,13 @@ class DeepQAgent:
         self.actions = tf.placeholder(tf.int32, shape=[None], name='actions')
         self.targets = tf.placeholder(tf.float32, shape=[None, 1], name='target_q_values')
 
-        self.online_q_values, online_vars = self.build_network(self.inputs, 'online_q_network')
-        self.target_q_values, target_vars = self.build_network(self.inputs, 'target_q_network')
+        self.online_q_values, online_vars = self.deep_q_network(self.inputs, 'online_q_network')
+        self.target_q_values, target_vars = self.deep_q_network(self.inputs, 'target_q_network')
 
         copy_ops = [target_var.assign(online_vars[var_name]) for var_name, target_var in target_vars.items()]
         self.copy_online_to_target = tf.group(*copy_ops)
 
-        q_values = tf.reduce_sum(self.target_q_values * tf.one_hot(self.actions, self.env.n_actions),
+        q_values = tf.reduce_sum(self.online_q_values * tf.one_hot(self.actions, self.env.n_actions),
                                   axis=1, keepdims=True)
 
         error = tf.abs(self.targets - q_values)
@@ -107,7 +107,6 @@ class DeepQAgent:
             loss, _ = self.sess.run([self.loss, self.train_op], feed_dict={
                 self.inputs: states, self.actions: actions, self.targets: y_values})
             step = self.step.eval()
-
             if step % self.copy_freq == 0:
                 self.copy_online_to_target.run()
 
@@ -123,49 +122,50 @@ class DeepQAgent:
     def play(self):
         pass
 
-    def build_network(self, x, name):
-        w_conv1 = self.weights([8, 8, 1, 32])
-        b_conv1 = self.bias(32)
+    def deep_q_network(self, state, name):
+        with tf.variable_scope(name) as scope:
+            w_conv1 = self.weights([8, 8, 1, 32], 'conv_weights_1')
+            b_conv1 = self.bias(32, 'conv_bias_1')
 
-        w_conv2 = self.weights([4, 4, 32, 64])
-        b_conv2 = self.bias(64)
+            w_conv2 = self.weights([4, 4, 32, 64], 'conv_weights_2')
+            b_conv2 = self.bias(64, 'conv_bias_2')
 
-        w_conv3 = self.weights([3, 3, 64, 64])
-        b_conv3 = self.bias(64)
+            w_conv3 = self.weights([3, 3, 64, 64], 'conv_weights_3')
+            b_conv3 = self.bias(64, 'conv_bias_3')
 
-        conv1 = tf.nn.relu(self.conv2d(x, w_conv1, 4) + b_conv1)
-        conv2 = tf.nn.relu(self.conv2d(conv1, w_conv2, 2) + b_conv2)
-        conv3 = tf.nn.relu(self.conv2d(conv2, w_conv3, 1) + b_conv3)
+            conv1 = tf.nn.relu(self.conv2d(state, w_conv1, 4) + b_conv1)
+            conv2 = tf.nn.relu(self.conv2d(conv1, w_conv2, 2) + b_conv2)
+            conv3 = tf.nn.relu(self.conv2d(conv2, w_conv3, 1) + b_conv3)
 
-        _, h, w, c = conv3.get_shape().as_list()
-        conv3_flat = tf.reshape(conv3, shape=[-1, h * w * c])
+            _, h, w, c = conv3.get_shape().as_list()
+            conv3_flat = tf.reshape(conv3, shape=[-1, h * w * c])
 
-        w_fc1 = self.weights([h * w * c, 512])
-        b_fc1 = self.bias(512)
+            w_fc1 = self.weights([h * w * c, 512], 'fc_weights_1')
+            b_fc1 = self.bias(512, 'fc_bias_1')
 
-        w_fc2 = self.weights([512, self.env.n_actions])
-        b_fc2 = self.bias(self.env.n_actions)
+            w_fc2 = self.weights([512, self.env.n_actions], 'fc_weights_2')
+            b_fc2 = self.bias(self.env.n_actions, 'fc_bias_2')
 
-        fc1 = tf.nn.relu(tf.matmul(conv3_flat, w_fc1) + b_fc1)
-        outputs = tf.matmul(fc1, w_fc2) + b_fc2
+            fc1 = tf.nn.relu(tf.matmul(conv3_flat, w_fc1) + b_fc1)
+            outputs = tf.matmul(fc1, w_fc2) + b_fc2
 
-        trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=name)
-        trainable_variables_by_name = {var.name[len(name):]: var
-                                       for var in trainable_variables}
+        trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope.name)
+        trainable_variables_by_name = {var.name[len(scope.name):]: var for var in trainable_variables}
         return outputs, trainable_variables_by_name
 
     def predict(self, eps, q_values):
-        if np.random.randn() < eps:
+        if np.random.rand() < eps:
             return np.random.randint(self.env.n_actions)
         return np.argmax(q_values)
 
-    def weights(self, kernel_shape):
-        return tf.Variable(tf.truncated_normal(kernel_shape, stddev=0.01), dtype=tf.float32, trainable=self.to_train,
-                           name='weights')
+    def weights(self, kernel_shape, name):
+        initializer = tf.contrib.layers.variance_scaling_initializer()
+        return tf.Variable(initializer(kernel_shape), dtype=tf.float32, trainable=self.to_train,
+                           name=name)
 
-    def bias(self, output_dim):
+    def bias(self, output_dim, name):
         return tf.Variable(tf.constant(0.01, shape=[output_dim]), dtype=tf.float32, trainable=self.to_train,
-                           name='biases')
+                           name=name)
 
     def conv2d(self, x, w, stride):
         return tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME')

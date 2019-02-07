@@ -22,7 +22,7 @@ class Config:
     train_freq = 4
     save_freq = 1000
     copy_freq = 10000
-    test_freq = 10000
+    test_freq = 5000
     replay_memory_size = 50000
 
     # Other
