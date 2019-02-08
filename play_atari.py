@@ -11,6 +11,8 @@ flags = tf.app.flags
 flags.DEFINE_string('env', 'MsPacman-v0', 'The name of the Atari environment to be used')
 flags.DEFINE_integer('screen_width', 80, 'The width of the screen')
 flags.DEFINE_integer('screen_height', 88, 'The height of the screen')
+flags.DEFINE_string('skip_start', 'max', 'The method for skipping steps at start of new game')
+flags.DEFINE_integer('skip_steps', 90, 'The max number of steps to skip at start of new game')
 
 # Training
 flags.DEFINE_boolean('to_train', True, 'Whether to train or test')

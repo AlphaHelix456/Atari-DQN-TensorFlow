@@ -19,10 +19,17 @@ class DeepQAgent:
         self.screen_height = config.screen_height
         self.screen_width = config.screen_width
 
-        if config.random_start:
-            self.new_game = self.env.new_random_game
-        else:
-            self.new_game = self.env.new_game
+        skip_start = {
+            'none': self.env.new_game,
+            'random': self.env.new_game_with_random_skip_start,
+            'max': self.env.new_game_with_max_skip_start
+        }
+
+        try:
+            self.new_game = skip_start[config.skip_start.lower().strip()]
+        except KeyError:
+            print('Valid skip_start options are "none", "random", and "max"')
+            raise
 
         self.to_train = config.to_train
         self.max_train_steps = config.max_train_steps
@@ -51,7 +58,7 @@ class DeepQAgent:
         self.copy_online_to_target = tf.group(*copy_ops)
 
         q_values = tf.reduce_sum(self.online_q_values * tf.one_hot(self.actions, self.env.n_actions),
-                                  axis=1, keepdims=True)
+                                 axis=1, keepdims=True)
 
         error = tf.abs(self.targets - q_values)
         clipped_error = tf.clip_by_value(error, 0.0, 1.0)

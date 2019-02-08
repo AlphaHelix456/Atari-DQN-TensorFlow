@@ -7,8 +7,7 @@ class AtariEnvironment:
         self.env = gym.make(config.env)
         self.n_actions = self.env.action_space.n
         self.lives = self.env.unwrapped.ale.lives()
-        self.max_random_start = config.max_random_start
-
+        self.skip_steps = config.skip_steps
         self.render = config.render
         self.screen_width = config.screen_width
         self.screen_height = config.screen_height
@@ -18,10 +17,22 @@ class AtariEnvironment:
         self.lives = self.env.unwrapped.ale.lives()
         return obs
 
-    def new_random_game(self):
+    def new_game_with_random_skip_start(self):
+        obs = self.env.reset()
+        random_skip_steps = random.randint(1, self.skip_steps+1)
+
+        for _ in range(random_skip_steps):
+            obs, reward, done, _ = self.env.step(0)
+            if self.render:
+                self.env.render()
+
+        self.lives = self.env.unwrapped.ale.lives()
+        return obs
+
+    def new_game_with_max_skip_start(self):
         obs = self.env.reset()
 
-        for _ in range(random.randint(1, self.max_random_start+1)):
+        for _ in range(self.skip_steps):
             obs, reward, done, _ = self.env.step(0)
             if self.render:
                 self.env.render()

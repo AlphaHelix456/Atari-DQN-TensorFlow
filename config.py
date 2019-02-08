@@ -4,8 +4,8 @@ class Config:
     env = 'MsPacMan-v0'
     screen_height = 88
     screen_width = 80
-    random_start = True
-    max_random_start = 30
+    skip_start = 'max'
+    skip_steps = 90
     render = False
 
     # Agent
