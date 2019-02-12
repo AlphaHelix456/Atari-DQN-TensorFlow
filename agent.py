@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import tensorflow as tf
+from time import sleep
 from experience import ReplayMemory
 from summary import Summary
 from tqdm import tqdm
@@ -28,8 +29,7 @@ class DeepQAgent:
         try:
             self.new_game = skip_start[config.skip_start.lower().strip()]
         except KeyError:
-            print('Valid skip_start options are "none", "random", and "max"')
-            raise
+            raise Exception('Valid skip_start options are "none", "random", and "max"')
 
         self.to_train = config.to_train
         self.max_train_steps = config.max_train_steps
@@ -43,35 +43,42 @@ class DeepQAgent:
         self.summary = Summary(config.test_freq, self.sess, config.checkpoint_dir)
         self.checkpoint_path = os.path.join(config.checkpoint_dir, 'ckpt')
 
-        self.replay_memory = ReplayMemory(config.replay_memory_size, config.batch_size)
-
-        self.step = tf.Variable(0, trainable=False, name='global_step')
-
         self.inputs = tf.placeholder(tf.float32, shape=[None, self.screen_height, self.screen_width, 1])
-        self.actions = tf.placeholder(tf.int32, shape=[None], name='actions')
-        self.targets = tf.placeholder(tf.float32, shape=[None, 1], name='target_q_values')
 
         self.online_q_values, online_vars = self.deep_q_network(self.inputs, 'online_q_network')
         self.target_q_values, target_vars = self.deep_q_network(self.inputs, 'target_q_network')
 
-        copy_ops = [target_var.assign(online_vars[var_name]) for var_name, target_var in target_vars.items()]
-        self.copy_online_to_target = tf.group(*copy_ops)
+        if self.to_train:
+            copy_ops = [target_var.assign(online_vars[var_name]) for var_name, target_var in target_vars.items()]
+            self.copy_online_to_target = tf.group(*copy_ops)
 
-        q_values = tf.reduce_sum(self.online_q_values * tf.one_hot(self.actions, self.env.n_actions),
-                                 axis=1, keepdims=True)
+            self.replay_memory = ReplayMemory(config.replay_memory_size, config.batch_size)
 
-        error = tf.abs(self.targets - q_values)
-        clipped_error = tf.clip_by_value(error, 0.0, 1.0)
-        linear_error = 2 * (error - clipped_error)
-        self.loss = tf.reduce_mean(tf.square(clipped_error) + linear_error)
+            self.step = tf.Variable(0, trainable=False, name='global_step')
 
-        optimizer = tf.train.MomentumOptimizer(learning_rate=config.lr,
-                                               momentum=config.momentum,
-                                               use_nesterov=True)
-        self.train_op = optimizer.minimize(self.loss, global_step=self.step)
+            self.actions = tf.placeholder(tf.int32, shape=[None], name='actions')
+            self.targets = tf.placeholder(tf.float32, shape=[None, 1], name='target_q_values')
+
+            q_values = tf.reduce_sum(self.online_q_values * tf.one_hot(self.actions, self.env.n_actions),
+                                     axis=1, keepdims=True)
+
+            error = tf.abs(self.targets - q_values)
+            clipped_error = tf.clip_by_value(error, 0.0, 1.0)
+            linear_error = 2 * (error - clipped_error)
+            self.loss = tf.reduce_mean(tf.square(clipped_error) + linear_error)
+
+            #optimizer = tf.train.MomentumOptimizer(learning_rate=config.lr,
+            #                                       momentum=config.momentum,
+            #                                       use_nesterov=True)
+            optimizer = tf.train.RMSPropOptimizer(learning_rate=config.lr,
+                                                  momentum=config.momentum,
+                                                  epsilon=config.eps,
+                                                  decay=config.decay)
+            self.train_op = optimizer.minimize(self.loss, global_step=self.step)
+
+            self.init = tf.global_variables_initializer()
 
         self.saver = tf.train.Saver()
-        self.init = tf.global_variables_initializer()
 
     def train(self):
         if os.path.isfile(self.checkpoint_path + '.index'):
@@ -127,7 +134,24 @@ class DeepQAgent:
                 break
 
     def play(self):
-        pass
+        obs = self.new_game()
+        state = self.env.preprocess(obs)
+        episode = 1
+        total_reward = 0
+        self.saver.restore(self.sess, self.checkpoint_path)
+        while True:
+            q_values = self.online_q_values.eval(feed_dict={self.inputs: [state]})
+            action = np.argmax(q_values)
+            obs, reward, done = self.env.step(action)
+            sleep(0.05)
+            total_reward += reward
+            print(total_reward)
+            if done:
+                print('Episode {} had reward {}'.format(episode, total_reward))
+                obs = self.new_game()
+                total_reward = 0
+                episode += 1
+            state = self.env.preprocess(obs)
 
     def deep_q_network(self, state, name):
         with tf.variable_scope(name) as scope:

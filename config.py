@@ -6,6 +6,7 @@ class Config:
     screen_width = 80
     skip_start = 'max'
     skip_steps = 90
+    done_after_life_lost = False
     render = False
 
     # Agent
@@ -15,15 +16,15 @@ class Config:
     eps_max = 1.0
     eps_decay_steps = 2000000
     lr = 0.001
-    momentum = 0.95
+    momentum = 0.0
     decay = 0.9
     eps = 1e-10
     max_train_steps = 4000000
     train_freq = 4
     save_freq = 1000
     copy_freq = 10000
-    test_freq = 5000
-    replay_memory_size = 50000
+    test_freq = 10000
+    replay_memory_size = 100000
 
     # Other
     seed = 42

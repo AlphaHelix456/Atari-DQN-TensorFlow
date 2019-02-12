@@ -1,5 +1,6 @@
 import gym
 import random
+from time import sleep
 
 
 class AtariEnvironment:
@@ -11,6 +12,7 @@ class AtariEnvironment:
         self.render = config.render
         self.screen_width = config.screen_width
         self.screen_height = config.screen_height
+        self.done_after_life_lost = config.done_after_life_lost
 
     def new_game(self):
         obs = self.env.reset()
@@ -36,22 +38,20 @@ class AtariEnvironment:
             obs, reward, done, _ = self.env.step(0)
             if self.render:
                 self.env.render()
+                sleep(0.05)
 
         self.lives = self.env.unwrapped.ale.lives()
         return obs
 
-    def step(self, action, to_train):
+    def step(self, action, to_train=False):
         obs, reward, done, _ = self.env.step(action)
-        #current_lives = self.env.unwrapped.ale.lives()
+        current_lives = self.env.unwrapped.ale.lives()
 
-        #if to_train and self.lives > current_lives:
-            #done = True
+        if self.done_after_life_lost and to_train and self.lives > current_lives:
+            done = True
 
         if self.render:
             self.env.render()
-
-        #if not done:
-            #self.lives = current_lives
 
         return obs, reward, done
 

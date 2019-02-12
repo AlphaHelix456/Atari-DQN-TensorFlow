@@ -1,3 +1,4 @@
+import os
 import random
 import tensorflow as tf
 from agent import DeepQAgent
@@ -13,6 +14,7 @@ flags.DEFINE_integer('screen_width', 80, 'The width of the screen')
 flags.DEFINE_integer('screen_height', 88, 'The height of the screen')
 flags.DEFINE_string('skip_start', 'max', 'The method for skipping steps at start of new game')
 flags.DEFINE_integer('skip_steps', 90, 'The max number of steps to skip at start of new game')
+flags.DEFINE_boolean('done_after_life_lost', False, 'Whether to continue an episode after losing a life during training')
 
 # Training
 flags.DEFINE_boolean('to_train', True, 'Whether to train or test')
@@ -47,6 +49,9 @@ def main(_):
         raise Exception("use_gpu flag is true when no GPUs are available")
 
     assert FLAGS.checkpoint_dir != '', 'Checkpoint directory must be specified'
+
+    if not FLAGS.to_train and not os.path.isfile(os.path.join(FLAGS.checkpoint_dir, 'ckpt.index')):
+        raise Exception("Checkpoint directory must contain a trained model to do testing")
 
     gpu_options = tf.GPUOptions(
         per_process_gpu_memory_fraction=calc_gpu_fraction(FLAGS.gpu_fraction), allow_growth=True)
